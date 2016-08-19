@@ -246,8 +246,8 @@ class GetCommandResponder(CommandResponderBase):
                             contextName, PDU, acInfo):
         (acFun, acCtx) = acInfo
         # rfc1905: 4.2.1.1
-        rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU), (acFun, acCtx))
         mgmtFun = self.snmpContext.getMibInstrum(contextName).readVars
+        rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU), (acFun, acCtx))
         yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0,
                           rres)
         self.releaseStateInformation(stateReference)
