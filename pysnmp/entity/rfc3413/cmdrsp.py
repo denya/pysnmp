@@ -246,10 +246,10 @@ class GetCommandResponder(CommandResponderBase):
                             contextName, PDU, acInfo):
         (acFun, acCtx) = acInfo
         # rfc1905: 4.2.1.1
-        rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU)
+        rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU), (acFun, acCtx))
         mgmtFun = self.snmpContext.getMibInstrum(contextName).readVars
         yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0,
-                          rres, (acFun, acCtx)))
+                          rres)
         self.releaseStateInformation(stateReference)
 
 
@@ -334,10 +334,8 @@ class SetCommandResponder(CommandResponderBase):
         mgmtFun = self.snmpContext.getMibInstrum(contextName).writeVars
         # rfc1905: 4.2.5.1-13
         try:
-            rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU)
-            yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0,
-                              rres,
-                                      (acFun, acCtx)))
+            rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU), (acFun, acCtx))
+            yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0, rres)
             self.releaseStateInformation(stateReference)
         except (pysnmp.smi.error.NoSuchObjectError,
                 pysnmp.smi.error.NoSuchInstanceError):
