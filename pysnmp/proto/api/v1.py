@@ -4,6 +4,7 @@
 # Copyright (c) 2005-2016, Ilya Etingof <ilya@glas.net>
 # License: http://pysnmp.sf.net/license.html
 #
+import asyncio
 from pyasn1.type import univ
 from pysnmp.proto import rfc1155, rfc1157, error
 from pysnmp import nextid
@@ -123,6 +124,7 @@ class PDUAPI(object):
         return varBinds
 
     @staticmethod
+    @asyncio.coroutine
     def setVarBinds(pdu, varBinds):
         varBindList = pdu.setComponentByPosition(3).getComponentByPosition(3)
         varBindList.clear()
