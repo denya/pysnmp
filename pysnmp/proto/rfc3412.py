@@ -4,6 +4,7 @@
 # Copyright (c) 2005-2016, Ilya Etingof <ilya@glas.net>
 # License: http://pysnmp.sf.net/license.html
 #
+import asyncio
 import sys
 from pyasn1.compat.octets import null
 from pysnmp.smi import builder, instrum
@@ -275,6 +276,7 @@ class MsgAndPduDispatcher(object):
         )
 
     # 4.2.1
+    @asyncio.coroutine
     def receiveMessage(self, snmpEngine, transportDomain,
                        transportAddress, wholeMsg):
         """Message dispatcher -- de-serialize message into PDU"""
@@ -415,7 +417,7 @@ class MsgAndPduDispatcher(object):
                     )
 
                 # 4.2.2.1.3
-                processPdu(snmpEngine, messageProcessingModel,
+                yield from processPdu(snmpEngine, messageProcessingModel,
                            securityModel, securityName, securityLevel,
                            contextEngineId, contextName, pduVersion,
                            PDU, maxSizeResponseScopedPDU, stateReference)

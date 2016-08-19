@@ -4,6 +4,7 @@
 # Copyright (c) 2005-2016, Ilya Etingof <ilya@glas.net>
 # License: http://pysnmp.sf.net/license.html
 #
+import asyncio
 import os
 import sys
 import tempfile
@@ -150,9 +151,9 @@ class SnmpEngine(object):
 
     def __receiveMessageCbFun(self, transportDispatcher, transportDomain,
                               transportAddress, wholeMsg):
-        self.msgAndPduDsp.receiveMessage(
+        asyncio.Task(self.msgAndPduDsp.receiveMessage(
             self, transportDomain, transportAddress, wholeMsg
-        )
+        ))
 
     def __receiveTimerTickCbFun(self, timeNow):
         self.msgAndPduDsp.receiveTimerTick(self, timeNow)

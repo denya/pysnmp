@@ -4,6 +4,7 @@
 # Copyright (c) 2005-2016, Ilya Etingof <ilya@glas.net>
 # License: http://pysnmp.sf.net/license.html
 #
+import asyncio
 import sys
 from pysnmp.proto import rfc1902, rfc1905, rfc3411, errind, error
 from pysnmp.proto.api import v2c  # backend is always SMIv2 compliant
@@ -34,6 +35,7 @@ class CommandResponderBase(object):
         )
         self.snmpContext = self.__pendingReqs = None
 
+    @asyncio.coroutine
     def sendVarBinds(self, snmpEngine, stateReference,
                      errorStatus, errorIndex, varBinds):
         (messageProcessingModel, securityModel, securityName,
@@ -43,7 +45,7 @@ class CommandResponderBase(object):
 
         v2c.apiPDU.setErrorStatus(PDU, errorStatus)
         v2c.apiPDU.setErrorIndex(PDU, errorIndex)
-        v2c.apiPDU.setVarBinds(PDU, varBinds)
+        yield from v2c.apiPDU.setVarBinds(PDU, varBinds)
 
         debug.logger & debug.flagApp and debug.logger(
             'sendVarBinds: stateReference %s, errorStatus %s, errorIndex %s, varBinds %s' % (
@@ -98,6 +100,7 @@ class CommandResponderBase(object):
         if stateReference in self.__pendingReqs:
             del self.__pendingReqs[stateReference]
 
+    @asyncio.coroutine
     def processPdu(self, snmpEngine, messageProcessingModel, securityModel,
                    securityName, securityLevel, contextEngineId, contextName,
                    pduVersion, PDU, maxSizeResponseScopedPDU, stateReference):
@@ -135,7 +138,7 @@ class CommandResponderBase(object):
             'processPdu: stateReference %s, varBinds %s' % (stateReference, varBinds))
 
         try:
-            self.handleMgmtOperation(snmpEngine, stateReference,
+            yield from self.handleMgmtOperation(snmpEngine, stateReference,
                                      contextName, PDU,
                                      (self.__verifyAccess, snmpEngine))
         # SNMPv2 SMI exceptions
@@ -183,7 +186,7 @@ class CommandResponderBase(object):
         else:  # successful request processor must release state info
             return
 
-        self.sendVarBinds(snmpEngine, stateReference, errorStatus,
+        yield from self.sendVarBinds(snmpEngine, stateReference, errorStatus,
                           errorIndex, varBinds)
 
         self.releaseStateInformation(stateReference)
@@ -238,13 +241,15 @@ class GetCommandResponder(CommandResponderBase):
     pduTypes = (rfc1905.GetRequestPDU.tagSet,)
 
     # rfc1905: 4.2.1
+    @asyncio.coroutine
     def handleMgmtOperation(self, snmpEngine, stateReference,
                             contextName, PDU, acInfo):
         (acFun, acCtx) = acInfo
         # rfc1905: 4.2.1.1
+        rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU)
         mgmtFun = self.snmpContext.getMibInstrum(contextName).readVars
-        self.sendVarBinds(snmpEngine, stateReference, 0, 0,
-                          mgmtFun(v2c.apiPDU.getVarBinds(PDU), (acFun, acCtx)))
+        yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0,
+                          rres, (acFun, acCtx)))
         self.releaseStateInformation(stateReference)
 
 
@@ -252,6 +257,7 @@ class NextCommandResponder(CommandResponderBase):
     pduTypes = (rfc1905.GetNextRequestPDU.tagSet,)
 
     # rfc1905: 4.2.2
+    @asyncio.coroutine
     def handleMgmtOperation(self, snmpEngine, stateReference,
                             contextName, PDU, acInfo):
         (acFun, acCtx) = acInfo
@@ -261,7 +267,7 @@ class NextCommandResponder(CommandResponderBase):
         while True:
             rspVarBinds = mgmtFun(varBinds, (acFun, acCtx))
             try:
-                self.sendVarBinds(snmpEngine, stateReference, 0, 0, rspVarBinds)
+                yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0, rspVarBinds)
             except error.StatusInformation:
                 idx = sys.exc_info()[1]['idx']
                 varBinds[idx] = (rspVarBinds[idx][0], varBinds[idx][1])
@@ -275,6 +281,7 @@ class BulkCommandResponder(CommandResponderBase):
     maxVarBinds = 64
 
     # rfc1905: 4.2.3
+    @asyncio.coroutine
     def handleMgmtOperation(self, snmpEngine, stateReference,
                             contextName, PDU, acInfo):
         (acFun, acCtx) = acInfo
@@ -310,7 +317,7 @@ class BulkCommandResponder(CommandResponderBase):
             M -= 1
 
         if len(rspVarBinds):
-            self.sendVarBinds(snmpEngine, stateReference, 0, 0, rspVarBinds)
+            yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0, rspVarBinds)
             self.releaseStateInformation(stateReference)
         else:
             raise pysnmp.smi.error.SmiError()
@@ -320,14 +327,16 @@ class SetCommandResponder(CommandResponderBase):
     pduTypes = (rfc1905.SetRequestPDU.tagSet,)
 
     # rfc1905: 4.2.5
+    @asyncio.coroutine
     def handleMgmtOperation(self, snmpEngine, stateReference,
                             contextName, PDU, acInfo):
         (acFun, acCtx) = acInfo
         mgmtFun = self.snmpContext.getMibInstrum(contextName).writeVars
         # rfc1905: 4.2.5.1-13
         try:
-            self.sendVarBinds(snmpEngine, stateReference, 0, 0,
-                              mgmtFun(v2c.apiPDU.getVarBinds(PDU),
+            rres = yield from mgmtFun(v2c.apiPDU.getVarBinds(PDU)
+            yield from self.sendVarBinds(snmpEngine, stateReference, 0, 0,
+                              rres,
                                       (acFun, acCtx)))
             self.releaseStateInformation(stateReference)
         except (pysnmp.smi.error.NoSuchObjectError,
