@@ -152,6 +152,8 @@ class CommandResponderBase(object):
                 statusInformation['val'] = errorIndication['val']
 
         # PDU-level SMI errors
+        except pysnmp.smi.error.CustomerError as ex:
+            errorStatus, errorIndex = ex.errorStatus, ex.errorIndex
         except pysnmp.smi.error.NoAccessError:
             errorStatus, errorIndex = 'noAccess', sys.exc_info()[1]['idx'] + 1
         except pysnmp.smi.error.WrongTypeError:

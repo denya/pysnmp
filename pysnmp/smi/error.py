@@ -48,6 +48,10 @@ class GenError(MibOperationError):
     pass
 
 
+class CustomerError(MibOperationError):
+    pass
+
+
 class NoAccessError(MibOperationError):
     pass
 
